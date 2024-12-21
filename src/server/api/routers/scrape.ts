@@ -6,9 +6,10 @@ import { z } from "zod";
 interface Location {
   name: string;
   rating: number;
-  typeBussness: string;
+  typeBusiness: string;
+  reviewNumber: string;
   link: string;
-  adress: string;
+  address: string;
 }
 
 // Create a TRPC router for scraping Google Maps
@@ -23,7 +24,7 @@ export const scrapeRouter = createTRPCRouter({
       // Launch Puppeteer browser
       const browser = await puppeteer.launch({
         executablePath: '/usr/bin/google-chrome', // Path to Chrome executable
-        headless: true, // Run in headless mode
+        headless: false, // Run in headless mode
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
       });
 
@@ -50,17 +51,17 @@ export const scrapeRouter = createTRPCRouter({
                   let totalHeight = 0;
                   const distance = 1000;
                   const scrollDelay = 3000;
-                
+
                   const timer = setInterval(() => {
                     const scrollHeightBefore = wrapper.scrollHeight;
                     wrapper.scrollBy(0, distance);
                     totalHeight += distance;
-                
+
                     if (totalHeight >= scrollHeightBefore) {
                       totalHeight = 0;
                       setTimeout(() => {
                         const scrollHeightAfter = wrapper.scrollHeight;
-                
+
                         if (scrollHeightAfter > scrollHeightBefore) {
                           return;
                         } else {
@@ -93,17 +94,35 @@ export const scrapeRouter = createTRPCRouter({
 
         // Extract locations from the page
         const locations: Location[] = await page.evaluate(() => {
-          const results: Location[] = [];
-          document.querySelectorAll(".Nv2PK").forEach((el) => {
-            const name = (el.querySelector(".qBF1Pd") as HTMLElement)?.innerText ?? "Unknown Name";
-            const rating = Number((el.querySelector(".UY7F9") as HTMLElement)?.innerText ?? "0");
-            const typeBussness = (el.querySelector(".W4Efsd") as HTMLElement)?.innerText ?? "Unknown Type";
-            const link = (el.querySelector("a") as HTMLAnchorElement)?.href ?? "No Link Available";
-            const adress = (el.querySelector("#QA0Szd > div > div > div.w6VYqd > div.bJzME.tTVLSc > div > div.e07Vkf.kA9KIf > div > div > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd.QjC7t > div:nth-child(61) > div > div.bfdHYd.Ppzolf.OFBs3e > div.lI9IFe > div.y7PRA > div > div > div.UaQhfb.fontBodyMedium > div:nth-child(4) > div:nth-child(1) > span:nth-child(3) > span:nth-child(2)") as HTMLElement)?.innerText ?? "No Adress Available";
-            results.push({ name, rating, typeBussness, link, adress });
-          });
-          return results;
+          const elements = document.querySelectorAll('.Nv2PK'); // Multiple elements
+          return Array.from(elements).map(el => ({
+            name: (el.querySelector(".qBF1Pd") as HTMLElement)?.innerText ?? "Unknown Name",
+            rating: parseFloat((el.querySelector(".W4Efsd") as HTMLElement)?.innerText ?? "0"),
+            reviewNumber: (el.querySelector(".UY7F9") as HTMLElement)?.innerText ?? "Unknown Type",
+            typeBusiness: (el.querySelector(".UY7F9") as HTMLElement)?.innerText ?? "Unknown Type",
+            link: (el.querySelector("a") as HTMLAnchorElement)?.href ?? "No Link Available",
+            address: (el.querySelector("#QA0Szd > div > div > div.w6VYqd > div.bJzME.tTVLSc > div > div.e07Vkf.kA9KIf > div > div > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd.QjC7t > div:nth-child(61) > div > div.bfdHYd.Ppzolf.OFBs3e > div.lI9IFe > div.y7PRA > div > div > div.UaQhfb.fontBodyMedium > div:nth-child(4) > div:nth-child(1) > span:nth-child(3) > span:nth-child(2)") as HTMLElement)?.innerText ?? "No Address Available"
+          }));
         });
+
+        // Click on each link and extract additional data
+        for (const location of locations) {
+          const detailPage = await browser.newPage();
+          await detailPage.goto(location.link, { waitUntil: "networkidle2" });
+
+          // Extract additional data from the detail page
+          const additionalData = await detailPage.evaluate(() => {
+            return {
+              phoneNumber: (document.querySelector('.Io6YTe .fontBodyMedium .kR99db .fdkmkc ') as HTMLElement)?.innerText ?? "No Phone Number",
+              website: (document.querySelector('.m6QErb .DUwDvf') as HTMLAnchorElement)?.href ?? "No Website"
+            };
+          });
+
+          // Merge additional data with the location
+          Object.assign(location, additionalData);
+
+          await detailPage.close();
+        }
 
         console.log("Scraping succeeded");
         return locations; // Return the extracted locations
@@ -112,6 +131,7 @@ export const scrapeRouter = createTRPCRouter({
         throw new Error("Scraping failed: " + (error instanceof Error ? error.message : String(error)));
       } finally {
         await browser.close(); // Close the browser
+        console.log("Browser closed");
       }
     })
 })

@@ -7,7 +7,7 @@ import type { scrapeRouter } from "../../server/api/routers/scrape";
 
 export default function Home() {
   const [query, setQuery] = useState<string>("");
-  const [results, setResults] = useState<{ name: string; link: string }[]>([]);
+  const [results, setResults] = useState<{ name: string; link: string; rating: number; reviewNumber: string }[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<TRPCClientError<typeof scrapeRouter> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -119,6 +119,8 @@ export default function Home() {
               rel="noopener noreferrer"
               className="text-blue-500"
             >
+            <strong>{result.rating}</strong> -{" "}
+            <strong>{result.reviewNumber}</strong> -{" "}
               View on Google Maps
             </a>
           </li>
