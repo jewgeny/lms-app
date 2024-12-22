@@ -2,10 +2,24 @@
 
 import { useState } from "react";
 import { api } from "@/utils/api";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Business {
   name: string;
   link: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  opening_time?: string;
+  img?: string;
 }
 
 export default function ScraperPage() {
@@ -16,7 +30,7 @@ export default function ScraperPage() {
 
   const scrapeGoogleMaps = api.scrape.scrapeGoogleMaps.useMutation({
     onSuccess: (data) => {
-      console.log('DATA', data);
+      console.log("DATA", data);
       setResults(data);
       setLoading(false);
     },
@@ -26,7 +40,13 @@ export default function ScraperPage() {
     },
   });
 
-  const handleSearch = () => {
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) {
+      setError("Please enter a search query.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResults([]);
@@ -37,39 +57,95 @@ export default function ScraperPage() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4">Google Maps Scraper</h1>
       <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          placeholder="Enter search query"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="border p-2 w-80"
-        />
-        <button
-          onClick={handleSearch}
-          disabled={loading}
-          className="bg-blue-500 text-white p-2"
-        >
-          {loading ? "Loading..." : "Search"}
-        </button>
+        <form  onSubmit={handleSearch} className="flex gap-2 mb-4">
+          <input
+            type="text"
+            placeholder="Enter search query"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="border p-2 w-80"
+          />
+          <Button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-500 text-white p-2"
+            variant="outline"
+          >
+            {loading ? "Suche läuft..." : "Suchen"}
+          </Button>
+        </form>
       </div>
 
       {error && <p className="text-red-500">{error}</p>}
 
-      <ul>
-        {results.map((result, index) => (
-          <li key={index} className="mb-2">
-            <strong>{result.name}</strong> -{" "}
-            <a
-              href={result.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500"
-            >
-              View on Google Maps
-            </a>
-          </li>
-        ))}
-      </ul>
+      {results.length > 0 && (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Index</TableHead>
+              <TableHead>Bild</TableHead>
+              <TableHead>Titel</TableHead>
+              <TableHead>Adresse</TableHead>
+              <TableHead>Telefon</TableHead>
+              <TableHead>Webseite</TableHead>
+              <TableHead>Map</TableHead>
+              <TableHead>Öffnungszeiten</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {results.map((result, index) => (
+              <TableRow key={index} className="mb-2">
+                <TableCell className="font-medium">{index + 1}</TableCell>
+                <TableCell>
+                  {result.img ? (
+                    <div
+                      style={{
+                        backgroundImage: `url(${result.img})`,
+                        width: "100px",
+                        height: "100px",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }}
+                    ></div>
+                  ) : (
+                    "No Image"
+                  )}
+                </TableCell>
+                <TableCell className="font-medium">{result.name}</TableCell>
+                <TableCell className="font-medium">{result.address || "N/A"}</TableCell>
+                <TableCell className="font-medium">{result.phone || "N/A"}</TableCell>
+                <TableCell className="font-medium">
+                  {result.website ? (
+                    <a
+                      href={result.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 underline"
+                    >
+                      Website
+                    </a>
+                  ) : (
+                    "N/A"
+                  )}
+                </TableCell>
+                <TableCell className="font-medium">
+                  <a
+                    href={result.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 underline"
+                  >
+                   Map
+                  </a>
+                </TableCell>
+                <TableCell className="font-medium">
+                  {result.opening_time || "N/A"}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }
