@@ -5,29 +5,28 @@ import { z } from "zod";
 // Define the Location interface
 interface Location {
   name: string;
-  rating: number;
-  typeBussness: string;
   link: string;
-  adress: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  opening_time?: string;
+  img?:string;
 }
 
-// Create a TRPC router for scraping Google Maps
 export const scrapeRouter = createTRPCRouter({
   scrapeGoogleMaps: publicProcedure
-    .input(z.object({ query: z.string() })) // Define the input schema
-    .mutation(async ({ input, signal }) => {
-      const searchQuery = input.query;
-      const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery.split(" ").join("+"))}`;
-      console.log("Navigating to URL:", url);
+  .input(z.object({ query: z.string() })) // Define the input schema
+  .mutation(async ({ input, signal }) => {
+    const searchQuery = input.query;
+    const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery.split(" ").join("+"))}`;
+    console.log("Navigating to URL:", url);
 
-      // Launch Puppeteer browser
-      const browser = await puppeteer.launch({
-        executablePath: '/usr/bin/google-chrome', // Path to Chrome executable
-        headless: true, // Run in headless mode
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
-      });
-
-      console.log("Browser launched");
+    // Launch Puppeteer browser
+    const browser = await puppeteer.launch({
+      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // Path to Chrome executable
+      headless: false, // Run in headless mode
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
+    });
 
       try {
         const page = await browser.newPage(); // Open a new page
@@ -50,17 +49,17 @@ export const scrapeRouter = createTRPCRouter({
                   let totalHeight = 0;
                   const distance = 1000;
                   const scrollDelay = 3000;
-                
+
                   const timer = setInterval(() => {
                     const scrollHeightBefore = wrapper.scrollHeight;
                     wrapper.scrollBy(0, distance);
                     totalHeight += distance;
-                
+
                     if (totalHeight >= scrollHeightBefore) {
                       totalHeight = 0;
                       setTimeout(() => {
                         const scrollHeightAfter = wrapper.scrollHeight;
-                
+
                         if (scrollHeightAfter > scrollHeightBefore) {
                           return;
                         } else {
@@ -91,27 +90,44 @@ export const scrapeRouter = createTRPCRouter({
 
         await autoScroll(page); // Auto-scroll the page to load more results
 
-        // Extract locations from the page
-        const locations: Location[] = await page.evaluate(() => {
-          const results: Location[] = [];
-          document.querySelectorAll(".Nv2PK").forEach((el) => {
-            const name = (el.querySelector(".qBF1Pd") as HTMLElement)?.innerText ?? "Unknown Name";
-            const rating = Number((el.querySelector(".UY7F9") as HTMLElement)?.innerText ?? "0");
-            const typeBussness = (el.querySelector(".W4Efsd") as HTMLElement)?.innerText ?? "Unknown Type";
-            const link = (el.querySelector("a") as HTMLAnchorElement)?.href ?? "No Link Available";
-            const adress = (el.querySelector("#QA0Szd > div > div > div.w6VYqd > div.bJzME.tTVLSc > div > div.e07Vkf.kA9KIf > div > div > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd > div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd.QjC7t > div:nth-child(61) > div > div.bfdHYd.Ppzolf.OFBs3e > div.lI9IFe > div.y7PRA > div > div > div.UaQhfb.fontBodyMedium > div:nth-child(4) > div:nth-child(1) > span:nth-child(3) > span:nth-child(2)") as HTMLElement)?.innerText ?? "No Adress Available";
-            results.push({ name, rating, typeBussness, link, adress });
-          });
-          return results;
+
+        // Extrahiere Standorte
+        const locations = await page.evaluate(() => {
+          const elements = document.querySelectorAll(".Nv2PK");
+          return Array.from(elements).map(el => ({
+            name: (el.querySelector(".qBF1Pd") as HTMLElement)?.innerText ?? "Unknown Name",
+            link: (el.querySelector("a") as HTMLAnchorElement)?.href ?? "No Link Available",
+          }));
         });
 
-        console.log("Scraping succeeded");
-        return locations; // Return the extracted locations
+        // Detailseiten verarbeiten
+        for (const location of locations) {
+          try {
+            const detailPage = await browser.newPage();
+            await detailPage.goto(location.link, { waitUntil: "networkidle2", timeout: 30000 });
+
+            const additionalData = await detailPage.evaluate(() => ({
+              address: document.querySelector(".CsEnBe .Io6YTe")?.textContent ?? "No Address Available",
+              phone: document.querySelector('.RcCsl [data-tooltip="Telefonnummer kopieren"] .Io6YTe')?.textContent ?? "No Phone Available",
+              website: document.querySelector(".RcCsl a.CsEnBe")?.getAttribute('href') ?? "No Website Available",
+              opening_time: document.querySelector(".OqCZI .ZDu9vd span span ")?.textContent ?? "No Opening Time Available",
+              img: document.querySelector(".ZKCDEc img")?.getAttribute('src') ?? "No Image Available"
+            }));
+
+            Object.assign(location, additionalData);
+            await detailPage.close();
+          } catch (error) {
+            console.error(`Error processing detail page for ${location.name}:`, error);
+          }
+        }
+
+        return locations;
       } catch (error) {
-        console.error("Scraping failed:", error instanceof Error ? error.message : error);
+        console.error("Scraping failed:", error);
         throw new Error("Scraping failed: " + (error instanceof Error ? error.message : String(error)));
       } finally {
-        await browser.close(); // Close the browser
+        await browser.close();
       }
-    })
-})
+    }),
+});
+

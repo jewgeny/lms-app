@@ -59,7 +59,12 @@ export default function ScraperPage() {
         {results.map((result, index) => (
           <li key={index} className="mb-2">
             <strong>{result.name}</strong> -{" "}
-            <a href={result.link} target="_blank" rel="noopener noreferrer" className="text-blue-500">
+            <a
+              href={result.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500"
+            >
               View on Google Maps
             </a>
           </li>
