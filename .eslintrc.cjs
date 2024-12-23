@@ -2,7 +2,8 @@
 const config = {
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
-    "project": true
+    "project": true,
+    "ignoreDuringBuilds": true
   },
   "plugins": [
     "@typescript-eslint"
@@ -39,8 +40,4 @@ const config = {
     ]
   }
 }
-module.exports = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-};
+module.exports = config;
