@@ -3,7 +3,6 @@ const config = {
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "project": true,
-    "ignoreDuringBuilds": true
   },
   "plugins": [
     "@typescript-eslint"
