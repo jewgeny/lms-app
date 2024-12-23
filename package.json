@@ -55,6 +55,8 @@
     "@typescript-eslint/parser": "^8.18.1",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.0.1",
+    "eslint-loader": "^4.0.2",
+    "eslint-webpack-plugin": "^4.2.0",
     "postcss": "^8.4.39",
     "prettier": "^3.3.2",
     "prettier-plugin-tailwindcss": "^0.6.5",
