@@ -20,6 +20,7 @@ interface Business {
   website?: string;
   opening_time?: string;
   img?: string;
+  rating?: string;
 }
 
 export default function ScraperPage() {
@@ -28,14 +29,18 @@ export default function ScraperPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+
   const scrapeGoogleMaps = api.scrape.scrapeGoogleMaps.useMutation({
     onSuccess: (data) => {
-      console.log("DATA", data);
       setResults(data);
       setLoading(false);
     },
     onError: (err) => {
-      setError(err.message || "An error occurred");
+      if (err.data?.code === 'CLIENT_CLOSED_REQUEST') {
+        setError("Query stopped by user.");
+      } else {
+        setError(err.message || "An error occurred");
+      }
       setLoading(false);
     },
   });
@@ -44,7 +49,7 @@ export default function ScraperPage() {
     e.preventDefault();
     if (!query.trim()) {
       setError("Please enter a search query.");
-      return;
+    scrapeGoogleMaps.mutate({ query });
     }
 
     setLoading(true);
@@ -65,14 +70,28 @@ export default function ScraperPage() {
             onChange={(e) => setQuery(e.target.value)}
             className="border p-2 w-80"
           />
-          <Button
+            <Button
             type="submit"
             disabled={loading}
             className="bg-blue-500 text-white p-2"
             variant="outline"
-          >
-            {loading ? "Suche läuft..." : "Suchen"}
-          </Button>
+            >
+              Query
+            </Button>
+            {loading && (
+            <Button
+              type="button"
+              onClick={() => {
+              scrapeGoogleMaps.reset();
+              setLoading(false);
+              setError("Query stopped by user.");
+              }}
+              className="bg-red-500 text-white p-2"
+              variant="outline"
+            >
+              Stop
+            </Button>
+            )}
         </form>
       </div>
 
@@ -90,6 +109,7 @@ export default function ScraperPage() {
               <TableHead>Webseite</TableHead>
               <TableHead>Map</TableHead>
               <TableHead>Öffnungszeiten</TableHead>
+              <TableHead>Bewertung</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -112,8 +132,8 @@ export default function ScraperPage() {
                   )}
                 </TableCell>
                 <TableCell className="font-medium">{result.name}</TableCell>
-                <TableCell className="font-medium">{result.address || "N/A"}</TableCell>
-                <TableCell className="font-medium">{result.phone || "N/A"}</TableCell>
+                <TableCell className="font-medium">{result.address ?? "N/A"}</TableCell>
+                <TableCell className="font-medium">{result.phone ?? "N/A"}</TableCell>
                 <TableCell className="font-medium">
                   {result.website ? (
                     <a
@@ -139,7 +159,10 @@ export default function ScraperPage() {
                   </a>
                 </TableCell>
                 <TableCell className="font-medium">
-                  {result.opening_time || "N/A"}
+                  {result.opening_time ?? "N/A"}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {result.rating ?? "N/A"}
                 </TableCell>
               </TableRow>
             ))}
