@@ -14,6 +14,16 @@ interface Location {
   img?:string;
 }
 
+const getExecutablePath = async (): Promise<string> => {
+  if (process.env.NODE_ENV === "development") {
+
+    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; // macOS
+  }
+
+  console.log("Using Chromium for production");
+  return await chromium.executablePath(); // Serverless
+};
+
 export const scrapeRouter = createTRPCRouter({
   scrapeGoogleMaps: publicProcedure
   .input(z.object({ query: z.string() })) // Define the input schema
@@ -22,10 +32,11 @@ export const scrapeRouter = createTRPCRouter({
     const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery.split(" ").join("+"))}`;
     console.log("Navigating to URL:", url);
 
+    const executablePath = await getExecutablePath();
     // Launch Puppeteer browser
     const browser = await puppeteer.launch({
       defaultViewport: chromium.defaultViewport,
-      executablePath: process.env.CHROME_EXECUTABLE_PATH || await chromium.executablePath(), // Path to Chrome executable
+      executablePath, // Path to Chrome executable
       //headless: false, // Run in headless mode
       headless: chromium.headless,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
