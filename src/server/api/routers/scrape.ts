@@ -1,4 +1,5 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
+import chromium from "@sparticuz/chromium";
 import * as puppeteer from "puppeteer";
 import { z } from "zod";
 
@@ -23,8 +24,10 @@ export const scrapeRouter = createTRPCRouter({
 
     // Launch Puppeteer browser
     const browser = await puppeteer.launch({
-      executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // Path to Chrome executable
-      headless: false, // Run in headless mode
+      defaultViewport: chromium.defaultViewport,
+      executablePath: process.env.CHROME_EXECUTABLE_PATH, // Path to Chrome executable
+      //headless: false, // Run in headless mode
+      headless: chromium.headless,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
     });
 
