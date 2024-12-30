@@ -25,7 +25,7 @@ export const scrapeRouter = createTRPCRouter({
     // Launch Puppeteer browser
     const browser = await puppeteer.launch({
       defaultViewport: chromium.defaultViewport,
-      executablePath: process.env.CHROME_EXECUTABLE_PATH, // Path to Chrome executable
+      executablePath: process.env.CHROME_EXECUTABLE_PATH || await chromium.executablePath(), // Path to Chrome executable
       //headless: false, // Run in headless mode
       headless: chromium.headless,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
