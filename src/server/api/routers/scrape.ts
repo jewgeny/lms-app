@@ -2,6 +2,17 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import * as puppeteer from "puppeteer";
 import { z } from "zod";
 
+// Define the Location interface
+interface Location {
+  name: string;
+  link: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  opening_time?: string;
+  img?:string;
+}
+
 export const scrapeRouter = createTRPCRouter({
   scrapeGoogleMaps: publicProcedure
   .input(z.object({ query: z.string() })) // Define the input schema
@@ -12,10 +23,7 @@ export const scrapeRouter = createTRPCRouter({
 
     // Launch Puppeteer browser
     const browser = await puppeteer.launch({
-      //for mac
       executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // Path to Chrome executable
-      //for windows
-      //executablePath: '/usr/bin/google-chrome', // Path to Chrome executable
       headless: false, // Run in headless mode
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
     });
@@ -103,7 +111,8 @@ export const scrapeRouter = createTRPCRouter({
               phone: document.querySelector('.RcCsl [data-tooltip="Telefonnummer kopieren"] .Io6YTe')?.textContent ?? "No Phone Available",
               website: document.querySelector(".RcCsl a.CsEnBe")?.getAttribute('href') ?? "No Website Available",
               opening_time: document.querySelector(".OqCZI .ZDu9vd span span ")?.textContent ?? "No Opening Time Available",
-              img: document.querySelector(".ZKCDEc img")?.getAttribute('src') ?? "No Image Available"
+              img: document.querySelector(".ZKCDEc img")?.getAttribute('src') ?? "No Image Available",
+              rating: document.querySelector(".Bd93Zb .jANrlb .fontDisplayLarge")?.textContent ?? "No Rating Available"
             }));
 
             Object.assign(location, additionalData);
@@ -122,4 +131,3 @@ export const scrapeRouter = createTRPCRouter({
       }
     }),
 });
-
