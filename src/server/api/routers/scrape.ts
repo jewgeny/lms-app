@@ -49,6 +49,20 @@ export const scrapeRouter = createTRPCRouter({
         async function autoScroll(page: puppeteer.Page, retries = 50) {
           for (let i = 0; i < retries; i++) {
             try {
+              const endOfListText = ["You've reached the end of the list.", "Das Ende der Liste ist erreicht."];
+              const reachedEnd = await page.evaluate((endOfListText) => {
+                const wrapper = document.querySelector('div[role="feed"]');
+                if (!wrapper) throw new Error("Scrollable section not found");
+
+                const endTextElement = Array.from(document.querySelectorAll('span')).find(el => endOfListText.includes(el.textContent || ""));
+                return !!endTextElement;
+              }, endOfListText);
+
+              if (reachedEnd) {
+                console.log("Reached the end of the list.");
+                break;
+              }
+
               await page.evaluate(async () => {
                 const wrapper = document.querySelector('div[role="feed"]');
                 if (!wrapper) throw new Error("Scrollable section not found");
