@@ -2,22 +2,19 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import chromium from "@sparticuz/chromium";
 import * as puppeteer from "puppeteer";
 import { z } from "zod";
-
-// Define the Location interface
-interface Location {
-  name: string;
-  link: string;
-  address?: string;
-  phone?: string;
-  website?: string;
-  opening_time?: string;
-  img?:string;
-}
+import { db } from "../../db"; // Import Prisma client
 
 const getExecutablePath = async (): Promise<string> => {
   if (process.env.NODE_ENV === "development") {
-
-    return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; // macOS
+    if (process.platform === "darwin") {
+      return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; // macOS
+    } else if (process.platform === "win32") {
+      return "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"; // Windows
+    } else if (process.platform === "linux") {
+      return "/usr/bin/google-chrome"; // Linux
+    } else {
+      throw new Error("Unsupported platform: " + process.platform);
+    }
   }
 
   console.log("Using Chromium for production");
@@ -26,32 +23,29 @@ const getExecutablePath = async (): Promise<string> => {
 
 export const scrapeRouter = createTRPCRouter({
   scrapeGoogleMaps: publicProcedure
-  .input(z.object({ query: z.string() })) // Define the input schema
-  .mutation(async ({ input, signal }) => {
-    const searchQuery = input.query;
-    const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery.split(" ").join("+"))}`;
-    console.log("Navigating to URL:", url);
+    .input(z.object({ query: z.string() })) // Define the input schema
+    .mutation(async ({ input, signal }) => {
+      const searchQuery = input.query;
+      const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery.split(" ").join("+"))}`;
+      console.log("Navigating to URL:", url);
 
-    const executablePath = await getExecutablePath();
-    // Launch Puppeteer browser
-    const browser = await puppeteer.launch({
-      defaultViewport: chromium.defaultViewport,
-      executablePath, // Path to Chrome executable
-      //headless: false, // Run in headless mode
-      headless: chromium.headless,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'], // Additional arguments
-    });
+      const executablePath = await getExecutablePath();
+      const browser = await puppeteer.launch({
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: chromium.headless,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      });
 
       try {
-        const page = await browser.newPage(); // Open a new page
-        await page.goto(url, { waitUntil: "networkidle2", signal }); // Navigate to the URL
+        const page = await browser.newPage();
+        await page.goto(url, { waitUntil: "networkidle2", signal });
 
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Additional wait time before starting to scrape
-        await page.waitForSelector('button[aria-label="Alle ablehnen"]', { timeout: 10000 }); // Wait for the "Reject all" button
-        await page.click('button[aria-label="Alle ablehnen"]'); // Click the "Reject all" button
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Additional wait time before starting to scrape
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await page.waitForSelector('button[aria-label="Alle ablehnen"]', { timeout: 10000 });
+        await page.click('button[aria-label="Alle ablehnen"]');
+        await new Promise(resolve => setTimeout(resolve, 10000));
 
-        // Function to auto-scroll the page
         async function autoScroll(page: puppeteer.Page, retries = 50) {
           for (let i = 0; i < retries; i++) {
             try {
@@ -102,11 +96,21 @@ export const scrapeRouter = createTRPCRouter({
           }
         }
 
-        await autoScroll(page); // Auto-scroll the page to load more results
+        await autoScroll(page);
 
+        interface Location {
+          name: string;
+          link: string;
+          address?: string;
+          phone?: string;
+          website?: string;
+          opening_time?: string;
+          img?: string;
+          rating?: string;
+          email?: string;
+        }
 
-        // Extrahiere Standorte
-        const locations = await page.evaluate(() => {
+        const locations: Location[] = await page.evaluate(() => {
           const elements = document.querySelectorAll(".Nv2PK");
           return Array.from(elements).map(el => ({
             name: (el.querySelector(".qBF1Pd") as HTMLElement)?.innerText ?? "Unknown Name",
@@ -114,7 +118,6 @@ export const scrapeRouter = createTRPCRouter({
           }));
         });
 
-        // Detailseiten verarbeiten
         for (const location of locations) {
           try {
             const detailPage = await browser.newPage();
@@ -133,6 +136,27 @@ export const scrapeRouter = createTRPCRouter({
             await detailPage.close();
           } catch (error) {
             console.error(`Error processing detail page for ${location.name}:`, error);
+          }
+        }
+
+        for (const location of locations) {
+          try {
+            const uniqueEmail = location.email || `no-email-${Date.now()}@example.com`;
+            await db.lead.create({
+              data: {
+                name: location.name,
+                link: location.link,
+                address: location.address,
+                phone: location.phone,
+                website: location.website,
+                opening_time: location.opening_time,
+                img: location.img,
+                rating: location.rating,
+                email: uniqueEmail,
+              },
+            });
+          } catch (error) {
+            console.error(`Error saving location ${location.name} to the database:`, error);
           }
         }
 

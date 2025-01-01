@@ -50,7 +50,7 @@ export default function ScraperPage() {
     e.preventDefault();
     if (!query.trim()) {
       setError("Please enter a search query.");
-    scrapeGoogleMaps.mutate({ query });
+      scrapeGoogleMaps.mutate({ query });
     }
 
     setLoading(true);
@@ -63,7 +63,7 @@ export default function ScraperPage() {
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-4">Google Maps Scraper</h1>
       <div className="flex gap-2 mb-4">
-        <form  onSubmit={handleSearch} className="flex gap-2 mb-4">
+        <form onSubmit={handleSearch} className="flex gap-2 mb-4">
           <input
             type="text"
             placeholder="Enter search query"
@@ -71,27 +71,20 @@ export default function ScraperPage() {
             onChange={(e) => setQuery(e.target.value)}
             className="border p-2 w-80"
           />
-            <Button
+          <Button
             type="submit"
             disabled={loading}
             className="bg-blue-500 text-white p-2"
             variant="outline"
-            >
-              Query
-            </Button>
+          >
+            Query
+          </Button>
             {loading && (
-            <Button
-              type="button"
-              onClick={() => {
-              scrapeGoogleMaps.reset();
-              setLoading(false);
-              setError("Query stopped by user.");
-              }}
-              className="bg-red-500 text-white p-2"
-              variant="outline"
-            >
-              Stop
-            </Button>
+            <div className="flex items-center justify-center w-full">
+              <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="bg-blue-500 h-2.5 rounded-full animate-pulse" style={{ width: "50%" }}></div>
+              </div>
+            </div>
             )}
         </form>
       </div>
@@ -156,7 +149,7 @@ export default function ScraperPage() {
                     rel="noopener noreferrer"
                     className="text-blue-500 underline"
                   >
-                   Map
+                    Map
                   </a>
                 </TableCell>
                 <TableCell className="font-medium">

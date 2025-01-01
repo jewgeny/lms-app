@@ -33,13 +33,13 @@ model User {
   deletedAt     DateTime?
   assignedLeads Lead[]    @relation("UserAssignedLeads")
   image         String?
-  Post Post[]
+  Post          Post[]
 }
 
 model Post {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdBy User     @relation(fields: [createdById], references: [id])
+  id          Int    @id @default(autoincrement())
+  name        String
+  createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
 }
 
@@ -52,19 +52,25 @@ model Profile {
 }
 
 model Lead {
-  id           Int        @id @default(autoincrement())
-  firstName    String
-  lastName     String
-  email        String     @unique
-  phone        String?
-  status       LeadStatus @default(NEW)
+  id           String     @id @default(uuid())
   createdAt    DateTime   @default(now())
-  assignedTo   User?      @relation(fields: [assignedToId], references: [id], name: "UserAssignedLeads")
+  updatedAt    DateTime   @updatedAt
+  name         String
+  email        String     @unique
+  link         String
+  address      String?
+  phone        String?
+  website      String?
+  opening_time String?
+  img          String?
+  rating       String?
+  status       LeadStatus @default(NEW)
   assignedToId String?
+  assignedTo User? @relation(fields: [assignedToId], references: [id], name: "UserAssignedLeads")
 }
 
 model Account {
-  id                Int     @id @default(autoincrement())
+  id                String     @id @default(uuid())
   userId            String?
   type              String
   provider          String
