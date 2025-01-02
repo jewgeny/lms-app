@@ -16,12 +16,12 @@ import { Pagination } from "@/components/ui/pagination"; // Import Pagination co
 interface Business {
   name: string;
   link: string;
-  address?: string;
-  phone?: string;
-  website?: string;
-  opening_time?: string;
-  img?: string;
-  rating?: string;
+  address?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  opening_time?: string | null;
+  img?: string | null;
+  rating?: string | null;
 }
 
 export default function ScraperPage() {

@@ -31,7 +31,7 @@ model User {
   sessions      Session[]
   profile       Profile?
   deletedAt     DateTime?
-  assignedLeads Lead[]    @relation("UserAssignedLeads")
+  assignedLeads Leads[]    @relation("UserAssignedLeads")
   image         String?
   Post          Post[]
 }
@@ -51,12 +51,12 @@ model Profile {
   userId String  @unique
 }
 
-model Lead {
-  id           String     @id @default(uuid())
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+model Leads {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   name         String
-  email        String     @unique
+  email        String   @unique
   link         String
   address      String?
   phone        String?
@@ -64,13 +64,14 @@ model Lead {
   opening_time String?
   img          String?
   rating       String?
+  operationId  String
   status       LeadStatus @default(NEW)
   assignedToId String?
-  assignedTo User? @relation(fields: [assignedToId], references: [id], name: "UserAssignedLeads")
+  assignedTo   User?      @relation(fields: [assignedToId], references: [id], name: "UserAssignedLeads")
 }
 
 model Account {
-  id                String     @id @default(uuid())
+  id                String  @id @default(uuid())
   userId            String?
   type              String
   provider          String

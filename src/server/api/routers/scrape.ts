@@ -153,10 +153,12 @@ export const scrapeRouter = createTRPCRouter({
           }
         }
 
+        const operationId = `op-${Date.now()}`;
+
         for (const location of locations) {
           try {
             const uniqueEmail = location.email || `no-email-${Date.now()}@example.com`;
-            await db.lead.create({
+            await db.leads.create({
               data: {
                 name: location.name,
                 link: location.link,
@@ -167,6 +169,7 @@ export const scrapeRouter = createTRPCRouter({
                 img: location.img,
                 rating: location.rating,
                 email: uniqueEmail,
+                operationId, // Add operationId to each record
               },
             });
           } catch (error) {
@@ -174,7 +177,13 @@ export const scrapeRouter = createTRPCRouter({
           }
         }
 
-        return locations;
+        // Return data from the database
+        const savedLocations = await db.leads.findMany({
+          where: {
+            operationId, // Filter by operationId
+          },
+        });
+        return savedLocations;
       } catch (error) {
         console.error("Scraping failed:", error);
         throw new Error("Scraping failed: " + (error instanceof Error ? error.message : String(error)));
