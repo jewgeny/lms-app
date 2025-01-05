@@ -31,15 +31,15 @@ model User {
   sessions      Session[]
   profile       Profile?
   deletedAt     DateTime?
-  assignedLeads Lead[]    @relation("UserAssignedLeads")
+  assignedLeads Leads[]    @relation("UserAssignedLeads")
   image         String?
-  Post Post[]
+  Post          Post[]
 }
 
 model Post {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdBy User     @relation(fields: [createdById], references: [id])
+  id          Int    @id @default(autoincrement())
+  name        String
+  createdBy   User   @relation(fields: [createdById], references: [id])
   createdById String
 }
 
@@ -51,20 +51,34 @@ model Profile {
   userId String  @unique
 }
 
-model Lead {
-  id           Int        @id @default(autoincrement())
-  firstName    String
-  lastName     String
-  email        String     @unique
+model Leads {
+  id           String   @id @default(uuid())
+  category     String
+  categoryId   String @default(uuid())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  name         String
+  email        String   @unique
+  link         String
+  address      String?
   phone        String?
+  website      String?
+  opening_time String?
+  img          String?
+  rating       String?
+  operationId  String
   status       LeadStatus @default(NEW)
-  createdAt    DateTime   @default(now())
-  assignedTo   User?      @relation(fields: [assignedToId], references: [id], name: "UserAssignedLeads")
   assignedToId String?
+  assignedTo   User?      @relation(fields: [assignedToId], references: [id], name: "UserAssignedLeads")
+}
+
+model Categories {
+  id String @id @default(uuid())
+  name String
 }
 
 model Account {
-  id                Int     @id @default(autoincrement())
+  id                String  @id @default(uuid())
   userId            String?
   type              String
   provider          String

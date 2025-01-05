@@ -1,9 +1,0 @@
--- AlterTable
-ALTER TABLE "Account" ALTER COLUMN "userId" DROP NOT NULL;
-
--- AlterTable
-ALTER TABLE "Session" ALTER COLUMN "userId" DROP NOT NULL;
-
--- AlterTable
-ALTER TABLE "User" ALTER COLUMN "firstName" DROP NOT NULL,
-ALTER COLUMN "lastName" DROP NOT NULL;
