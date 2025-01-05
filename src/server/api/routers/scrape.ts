@@ -118,7 +118,7 @@ export const scrapeRouter = createTRPCRouter({
         for (const location of locations) {
           try {
             const detailPage = await browser.newPage();
-            await detailPage.goto(location.link, { waitUntil: "networkidle2", timeout: 30000 });
+            await detailPage.goto(location.link, { waitUntil: "networkidle2", timeout: 60000 });
 
             const additionalData = await detailPage.evaluate(() => ({
               address: document.querySelector(".CsEnBe .Io6YTe")?.textContent ?? "No Address Available",
