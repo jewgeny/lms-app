@@ -1,6 +1,5 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import puppeteer from "puppeteer-core"; // Cambio a puppeteer-core
-import chromium from "@sparticuz/chromium"; // Añadido import de chromium 
+import puppeteer, { Page } from "puppeteer";
 import { z } from "zod";
 import { db } from "../../db";
 
@@ -17,22 +16,16 @@ type Location = {
   email?: string;
 };
 
-// Actualizada función para usar chromium
-const getChromiumExecutablePath = () => chromium.executablePath();
-
 export const scrapeRouter = createTRPCRouter({
   scrapeGoogleMaps: publicProcedure
     .input(z.object({ query: z.string(), operationId: z.string().optional() }))
-    .mutation(async ({ input }: { input: { query: string; operationId?: string } }) => {
+    .mutation(async ({ input }) => {
       const operationId = input.operationId || `op-${Date.now()}`;
       const url = `https://www.google.com/maps/search/${encodeURIComponent(input.query)}`;
 
-      // Configuración mejorada para entornos serverless
       const browser = await puppeteer.launch({
-        headless: true,
-        executablePath: getChromiumExecutablePath(),
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
 
       const detailedLocations: Location[] = [];
@@ -48,10 +41,9 @@ export const scrapeRouter = createTRPCRouter({
 
         await autoScroll(page);
 
-        // Corregido error de sintaxis en la evaluación
         const locations: { name: string; link: string }[] = await page.evaluate(() => {
           return Array.from(document.querySelectorAll(".Nv2PK")).map((el) => ({
-            name: el.querySelector(".qBF1Pd")?.textContent ?? "Unknown Name",
+            name: el.querySelector(".qBF1Pd")?.textContent?.trim() ?? "Unknown Name",
             link: (el.querySelector("a") as HTMLAnchorElement)?.href ?? "",
           }));
         });
@@ -63,27 +55,26 @@ export const scrapeRouter = createTRPCRouter({
             await detailPage.goto(location.link, { waitUntil: "networkidle2" });
 
             const data = await detailPage.evaluate(() => ({
-              address: document.querySelector(".CsEnBe .Io6YTe")?.textContent ?? "",
-              phone: document.querySelector('.RcCsl [data-tooltip*="Telefonnummer"] .Io6YTe')?.textContent ?? "",
-              website: (document.querySelector(".RcCsl a.CsEnBe") as HTMLAnchorElement | null)?.href ?? "",
-              opening_time: document.querySelector(".OqCZI .ZDu9vd span span")?.textContent ?? "",
-              img: (document.querySelector(".ZKCDEc img") as HTMLImageElement | null)?.src ?? "",
-              rating: document.querySelector(".Bd93Zb .fontDisplayLarge")?.textContent ?? "",
-              category: document.querySelector(".DkEaL")?.textContent ?? "Unknown Category",
-              email: document.querySelector(".some-email-selector")?.textContent ?? "",
+              address: document.querySelector(".CsEnBe .Io6YTe")?.textContent?.trim() ?? "",
+              phone: document.querySelector('.RcCsl [data-tooltip*="Telefonnummer"] .Io6YTe')?.textContent?.trim() ?? "",
+              website: (document.querySelector(".RcCsl a.CsEnBe") as HTMLAnchorElement)?.href ?? "",
+              opening_time: document.querySelector(".OqCZI .ZDu9vd span span")?.textContent?.trim() ?? "",
+              img: (document.querySelector(".ZKCDEc img") as HTMLImageElement)?.src ?? "",
+              rating: document.querySelector(".Bd93Zb .fontDisplayLarge")?.textContent?.trim() ?? "",
+              category: document.querySelector(".DkEaL")?.textContent?.trim() ?? "Unknown Category",
+              email: document.querySelector(".some-email-selector")?.textContent?.trim() ?? "",
             }));
 
             detailedLocations.push({ ...location, ...data });
-
-            await detailPage.close();
           } catch (error) {
-            console.error("Detail page scraping error:", error);
+            console.error(`Error scraping detail for ${location.name}:`, error);
+          } finally {
+            await detailPage.close();
           }
         }
 
         await page.close();
 
-        // Guardar en Prisma con tipos correctos
         await db.leads.createMany({
           data: detailedLocations.map((location) => ({
             name: location.name,
@@ -94,9 +85,10 @@ export const scrapeRouter = createTRPCRouter({
             opening_time: location.opening_time,
             img: location.img,
             rating: location.rating,
-            email: location.email && location.email.trim() !== "" 
-              ? location.email 
-              : `no-email-${Date.now()}@example.com`,
+            email:
+              location.email && location.email.trim() !== ""
+                ? location.email
+                : `no-email-${Date.now()}@example.com`,
             operationId,
             category: location.category,
           })),
@@ -114,7 +106,7 @@ export const scrapeRouter = createTRPCRouter({
 });
 
 // Auto-scroll function
-async function autoScroll(page: puppeteer.Page) {
+async function autoScroll(page: Page) {
   await page.evaluate(async () => {
     const wrapper = document.querySelector('div[role="feed"]');
     if (!wrapper) throw new Error("Scrollable section not found");
