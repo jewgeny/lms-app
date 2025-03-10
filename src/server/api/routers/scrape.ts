@@ -1,5 +1,5 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import puppeteer, { Page } from "puppeteer-core";
+import puppeteer, { Page } from "puppeteer";
 import { z } from "zod";
 import { db } from "../../db";
 
@@ -39,7 +39,7 @@ export const scrapeRouter = createTRPCRouter({
           await page.click(cookieBtnSelector);
         }
 
-        async function autoScroll(page: puppeteer.Page, retries = 50) {
+        async function autoScroll(page: Page, retries = 50) {
           for (let i = 0; i < retries; i++) {
             try {
               const endOfListText = ["You've reached the end of the list.", "Das Ende der Liste ist erreicht."];
