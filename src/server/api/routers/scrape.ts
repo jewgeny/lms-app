@@ -39,6 +39,71 @@ export const scrapeRouter = createTRPCRouter({
           await page.click(cookieBtnSelector);
         }
 
+        async function autoScroll(page: puppeteer.Page, retries = 50) {
+          for (let i = 0; i < retries; i++) {
+            try {
+              const endOfListText = ["You've reached the end of the list.", "Das Ende der Liste ist erreicht."];
+              const reachedEnd = await page.evaluate((endOfListText: string | string[]) => {
+                const wrapper = document.querySelector('div[role="feed"]');
+                if (!wrapper) throw new Error("Scrollable section not found");
+
+                const endTextElement = Array.from(document.querySelectorAll('span')).find(el => endOfListText.includes(el.textContent || ""));
+                return !!endTextElement;
+              }, endOfListText);
+
+              if (reachedEnd) {
+                console.log("Reached the end of the list.");
+                break;
+              }
+
+              await page.evaluate(async () => {
+                const wrapper = document.querySelector('div[role="feed"]');
+                if (!wrapper) throw new Error("Scrollable section not found");
+
+                await new Promise<void>((resolve, _reject) => {
+                  let totalHeight = 0;
+                  const distance = 1000;
+                  const scrollDelay = 3000;
+
+                  const timer = setInterval(() => {
+                    const scrollHeightBefore = wrapper.scrollHeight;
+                    wrapper.scrollBy(0, distance);
+                    totalHeight += distance;
+
+                    if (totalHeight >= scrollHeightBefore) {
+                      totalHeight = 0;
+                      setTimeout(() => {
+                        const scrollHeightAfter = wrapper.scrollHeight;
+
+                        if (scrollHeightAfter > scrollHeightBefore) {
+                          return;
+                        } else {
+                          clearInterval(timer);
+                          resolve();
+                        }
+                      }, scrollDelay);
+                    }
+                  }, 200);
+                });
+              });
+              return;
+            } catch (error) {
+              console.log(`Error during autoScroll, retrying... (${i + 1}/${retries})`);
+              console.error(error);
+
+              const currentUrl = page.url();
+              if (!currentUrl.includes("google.com/maps/search")) {
+                console.log("Page navigated away, stopping autoScroll");
+                throw error;
+              }
+
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              if (i === retries - 1) throw error;
+            }
+          }
+        }
+
+
         await autoScroll(page);
 
         const locations: { name: string; link: string }[] = await page.evaluate(() => {
