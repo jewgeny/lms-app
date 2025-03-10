@@ -72,7 +72,7 @@ export const scrapeRouter = createTRPCRouter({
             opening_time: location.opening_time,
             img: location.img,
             rating: location.rating,
-            email: location.email || `no-email-${Date.now()}@example.com`,
+            email: ('email' in location && location.email) ? location.email : `no-email-${Date.now()}@example.com`,
             operationId,
             category: location.category || "Unknown Category",
           })),
