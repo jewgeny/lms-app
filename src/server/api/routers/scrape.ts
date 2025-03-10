@@ -1,204 +1,110 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import chromium from "@sparticuz/chromium";
-import * as puppeteer from "puppeteer";
+import puppeteer from "puppeteer";
 import { z } from "zod";
-import { db } from "../../db"; // Import Prisma client
+import { db } from "../../db";
 
-const getExecutablePath = async (): Promise<string> => {
-  if (process.env.NODE_ENV === "development") {
-    if (process.platform === "darwin") {
-      return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; // macOS
-    } else if (process.platform === "win32") {
-      return "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"; // Windows
-    } else if (process.platform === "linux") {
-      return "/usr/bin/google-chrome"; // Linux
-    } else {
-      throw new Error("Unsupported platform: " + process.platform);
-    }
-  }
-
-  console.log("Using Chromium for production");
-  return await chromium.executablePath(); // Serverless
-};
+const getChromiumExecutablePath = () => puppeteer.executablePath();
 
 export const scrapeRouter = createTRPCRouter({
   scrapeGoogleMaps: publicProcedure
-    .input(z.object({ query: z.string() })) // Define the input schema
+    .input(z.object({ query: z.string() }))
     .mutation(async ({ input, signal }) => {
-      const searchQuery = input.query;
-      const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery.split(" ").join("+"))}`;
-      console.log("Navigating to URL:", url);
-
-      const executablePath = await getExecutablePath();
+      const url = `https://www.google.com/maps/search/${encodeURIComponent(input.query)}`;
       const browser = await puppeteer.launch({
-        defaultViewport: chromium.defaultViewport,
-        executablePath,
-        headless: chromium.headless,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        headless: "new",
+        executablePath: getChromiumExecutablePath(),
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
+
+      const operationId = `op-${Date.now()}`;
 
       try {
         const page = await browser.newPage();
-        await page.goto(url, { waitUntil: "networkidle2", signal });
+        await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await page.waitForSelector('button[aria-label="Alle ablehnen"]', { timeout: 10000 });
-        await page.click('button[aria-label="Alle ablehnen"]');
-        await new Promise(resolve => setTimeout(resolve, 10000));
-
-        async function autoScroll(page: puppeteer.Page, retries = 50) {
-          for (let i = 0; i < retries; i++) {
-            try {
-              const endOfListText = ["You've reached the end of the list.", "Das Ende der Liste ist erreicht."];
-              const reachedEnd = await page.evaluate((endOfListText) => {
-                const wrapper = document.querySelector('div[role="feed"]');
-                if (!wrapper) throw new Error("Scrollable section not found");
-
-                const endTextElement = Array.from(document.querySelectorAll('span')).find(el => endOfListText.includes(el.textContent || ""));
-                return !!endTextElement;
-              }, endOfListText);
-
-              if (reachedEnd) {
-                console.log("Reached the end of the list.");
-                break;
-              }
-
-              await page.evaluate(async () => {
-                const wrapper = document.querySelector('div[role="feed"]');
-                if (!wrapper) throw new Error("Scrollable section not found");
-
-                await new Promise<void>((resolve, _reject) => {
-                  let totalHeight = 0;
-                  const distance = 1000;
-                  const scrollDelay = 3000;
-
-                  const timer = setInterval(() => {
-                    const scrollHeightBefore = wrapper.scrollHeight;
-                    wrapper.scrollBy(0, distance);
-                    totalHeight += distance;
-
-                    if (totalHeight >= scrollHeightBefore) {
-                      totalHeight = 0;
-                      setTimeout(() => {
-                        const scrollHeightAfter = wrapper.scrollHeight;
-
-                        if (scrollHeightAfter > scrollHeightBefore) {
-                          return;
-                        } else {
-                          clearInterval(timer);
-                          resolve();
-                        }
-                      }, scrollDelay);
-                    }
-                  }, 200);
-                });
-              });
-              return;
-            } catch (error) {
-              console.log(`Error during autoScroll, retrying... (${i + 1}/${retries})`);
-              console.error(error);
-
-              const currentUrl = page.url();
-              if (!currentUrl.includes("google.com/maps/search")) {
-                console.log("Page navigated away, stopping autoScroll");
-                throw error;
-              }
-
-              await new Promise(resolve => setTimeout(resolve, 5000));
-              if (i === retries - 1) throw error;
-            }
-          }
+        // Aceptar cookies si existe el botón
+        const cookieBtnSelector = 'button[aria-label="Alle ablehnen"]';
+        if (await page.$(cookieBtnSelector)) {
+          await page.click(cookieBtnSelector);
         }
 
         await autoScroll(page);
 
-        interface Location {
-          name: string;
-          link: string;
-          address?: string;
-          phone?: string;
-          website?: string;
-          opening_time?: string;
-          img?: string;
-          rating?: string;
-          email?: string;
-          category?: string;
-        }
-
-        const locations: Location[] = await page.evaluate(() => {
-          const elements = document.querySelectorAll(".Nv2PK");
-          return Array.from(elements).map(el => ({
-            name: (el.querySelector(".qBF1Pd") as HTMLElement)?.innerText ?? "Unknown Name",
-            link: (el.querySelector("a") as HTMLAnchorElement)?.href ?? "No Link Available",
+        const locations = await page.evaluate(() => {
+          return Array.from(document.querySelectorAll(".Nv2PK")).map((el) => ({
+            name: el.querySelector(".qBF1Pd")?.textContent ?? "Unknown Name",
+            link: el.querySelector("a")?.href ?? "",
           }));
         });
 
+        const detailedLocations = [];
         for (const location of locations) {
+          const detailPage = await browser.newPage();
           try {
-            const detailPage = await browser.newPage();
-            await detailPage.goto(location.link, { waitUntil: "networkidle2", timeout: 60000 });
+            await detailPage.goto(location.link, { waitUntil: "networkidle2" });
 
-            const additionalData = await detailPage.evaluate(() => ({
-              address: document.querySelector(".CsEnBe .Io6YTe")?.textContent ?? "No Address Available",
-              phone: document.querySelector('.RcCsl [data-tooltip="Telefonnummer kopieren"] .Io6YTe')?.textContent ?? "No Phone Available",
-              website: document.querySelector(".RcCsl a.CsEnBe")?.getAttribute('href') ?? "No Website Available",
-              opening_time: document.querySelector(".OqCZI .ZDu9vd span span ")?.textContent ?? "No Opening Time Available",
-              img: document.querySelector(".ZKCDEc img")?.getAttribute('src') ?? "No Image Available",
-              rating: document.querySelector(".Bd93Zb .jANrlb .fontDisplayLarge")?.textContent ?? "No Rating Available",
-              category: document.querySelector(".DkEaL")?.textContent ?? "No Category Available",
+            const data = await detailPage.evaluate(() => ({
+              address: document.querySelector(".CsEnBe .Io6YTe")?.textContent ?? "",
+              phone: document.querySelector('.RcCsl [data-tooltip*="Telefonnummer"] .Io6YTe')?.textContent ?? "",
+              website: document.querySelector(".RcCsl a.CsEnBe")?.href ?? "",
+              opening_time: document.querySelector(".OqCZI .ZDu9vd span span")?.textContent ?? "",
+              img: document.querySelector(".ZKCDEc img")?.src ?? "",
+              rating: document.querySelector(".Bd93Zb .fontDisplayLarge")?.textContent ?? "",
+              category: document.querySelector(".DkEaL")?.textContent ?? "",
             }));
 
-            Object.assign(location, additionalData);
+            detailedLocations.push({ ...location, ...data });
+          } catch (error) {
+            console.error(`Error fetching details for ${location.name}:`, error);
+          } finally {
             await detailPage.close();
-          } catch (error) {
-            console.error(`Error processing detail page for ${location.name}:`, error);
           }
         }
 
-        const operationId = `op-${Date.now()}`;
-
-        for (const location of locations) {
-          try {
-            const uniqueEmail = location.email || `no-email-${Date.now()}@example.com`;
-            const categoryId = location.category; // Assuming you have a way to get the category ID
-
-            if (!categoryId) {
-              console.error(`No category ID for location ${location.name}`);
-              continue;
-            }
-
-            await db.leads.create({
-              data: {
-                name: location.name,
-                link: location.link,
-                address: location.address,
-                phone: location.phone,
-                website: location.website,
-                opening_time: location.opening_time,
-                img: location.img,
-                rating: location.rating,
-                email: uniqueEmail,
-                operationId, // Add operationId to each record,
-                category: location.category || "Unknown Category",
-              },
-            });
-          } catch (error) {
-            console.error(`Error saving location ${location.name} to the database:`, error);
-          }
-        }
-
-        // Return data from the database
-        const savedLocations = await db.leads.findMany({
-          where: {
-            operationId, // Filter by operationId
-          },
+        // Guardar en la base de datos con Prisma en paralelo
+        await db.leads.createMany({
+          data: detailedLocations.map((location) => ({
+            name: location.name,
+            link: location.link,
+            address: location.address,
+            phone: location.phone,
+            website: location.website,
+            opening_time: location.opening_time,
+            img: location.img,
+            rating: location.rating,
+            email: location.email || `no-email-${Date.now()}@example.com`,
+            operationId,
+            category: location.category || "Unknown Category",
+          })),
+          skipDuplicates: true,
         });
-        return savedLocations;
+
+        // Devolver registros guardados
+        return db.leads.findMany({ where: { operationId } });
+
       } catch (error) {
-        console.error("Scraping failed:", error);
-        throw new Error("Scraping failed: " + (error instanceof Error ? error.message : String(error)));
+        console.error("Scraping error:", error);
+        throw new Error(`Scraping failed: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
         await browser.close();
       }
     }),
 });
+
+// Función optimizada para autoscroll
+async function autoScroll(page: puppeteer.Page) {
+  await page.evaluate(async () => {
+    const wrapper = document.querySelector('div[role="feed"]');
+    if (!wrapper) throw new Error("Scrollable section not found");
+
+    await new Promise<void>((resolve) => {
+      const interval = setInterval(() => {
+        wrapper.scrollBy(0, 1000);
+        if (wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight) {
+          clearInterval(interval);
+          resolve();
+        }
+      }, 500);
+    });
+  });
+}
