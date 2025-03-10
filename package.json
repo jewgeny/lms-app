@@ -13,7 +13,7 @@
     "dev": "next dev --turbo",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,mdx}\" --cache",
-    "postinstall": "prisma generate && node -e \"import('puppeteer').then(async p => {const browser = await p.default.launch({headless:'new'}); await browser.close();})\"",
+    "postinstall": "prisma generate && node -e \"import('puppeteer').then(async p => {const browser = await p.default.launch({headless:'new', args:['--no-sandbox']}); await browser.close();})\"",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
