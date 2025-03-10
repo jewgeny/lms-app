@@ -46,9 +46,9 @@ export const scrapeRouter = createTRPCRouter({
             const data = await detailPage.evaluate(() => ({
               address: document.querySelector(".CsEnBe .Io6YTe")?.textContent ?? "",
               phone: document.querySelector('.RcCsl [data-tooltip*="Telefonnummer"] .Io6YTe')?.textContent ?? "",
-              website: document.querySelector(".RcCsl a.CsEnBe")?.href ?? "",
+              website: (document.querySelector(".RcCsl a.CsEnBe") as HTMLAnchorElement | null)?.href ?? "",
               opening_time: document.querySelector(".OqCZI .ZDu9vd span span")?.textContent ?? "",
-              img: document.querySelector(".ZKCDEc img")?.src ?? "",
+              img: (document.querySelector(".ZKCDEc img") as HTMLImageElement | null)?.src ?? "",
               rating: document.querySelector(".Bd93Zb .fontDisplayLarge")?.textContent ?? "",
               category: document.querySelector(".DkEaL")?.textContent ?? "",
             }));
