@@ -1,5 +1,5 @@
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import puppeteer, { Page } from "puppeteer";
+import puppeteer, { Page } from "puppeteer-core";
 import { z } from "zod";
 import { db } from "../../db";
 
