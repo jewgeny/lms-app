@@ -11,7 +11,7 @@ export const scrapeRouter = createTRPCRouter({
     .mutation(async ({ input, signal }) => {
       const url = `https://www.google.com/maps/search/${encodeURIComponent(input.query)}`;
       const browser = await puppeteer.launch({
-        headless: "new",
+        headless: true,
         executablePath: getChromiumExecutablePath(),
         args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
